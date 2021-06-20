@@ -1,0 +1,235 @@
+#+TITLE: The Factory Pattern
+
+In the factory design pattern, a *client* asks for an object without knowing where the object is coming from (what class is used to generate it).
+The idea behind a factory is to simplify the object creation process. It is easier to track which objects are created if this is done through a
+central function, compared  to letting a client create objects using direct class instantiation. A factory reduces the complexity of maintaining an application
+by decoupling the code that creates an object from the code that uses it.
+
+Factories typically come in two forms - the *factory method*, which is a method (or simply a function) that returns a different object per input parameter,
+and the *abstract factory*, which is a group of factory methods used to create a family of related objects.
+
+* The Factory Method
+
+We execute it, passing a parameter that provides information about what we want, and the wanted object is created.
+
+* Use Cases
+
+If you realize that you cannot track the objects created by your application because the code that creates them is in many different places
+instead of in a single function/method, you should consider using the factory method pattern. The factory method centralized object creation
+and tracking your objects becomes much easier.
+
+* Implementing the Factory Method
+
+#+BEGIN_SRC json :tangle data/movies.json
+[
+    {"title":"After Dark in Central Park",
+     "year":1900,
+     "director":null,
+     "cast":null,
+     "genre":null},
+    {"title":"Boarding School Girls' Pajama Parade",
+     "year":1900,
+     "director":null,
+     "cast":null,
+     "genre":null},
+    {"title":"Buffalo Bill's Wild West Parad",
+     "year":1900,
+     "director":null,
+     "cast":null,
+     "genre":null},
+    {"title":"Caught",
+     "year":1900,
+     "director":null,
+     "cast":null,
+     "genre":null},
+    {"title":"Clowns Spinning Hats",
+     "year":1900,
+     "director":null,
+     "cast":null,
+     "genre":null},
+    {"title":"Capture of Boer Battery by British",
+     "year":1900,
+     "director":"James H. White",
+     "cast":null,
+     "genre":"Short documentary"},
+    {"title":"The Enchanted Drawing",
+     "year":1900,
+     "director":"J. Stuart Blackton",
+     "cast":null,
+     "genre":null},
+    {"title":"Family Troubles",
+     "year":1900,
+     "director":null,
+     "cast":null,
+     "genre":null},
+    {"title":"Feeding Sea Lions",
+     "year":1900,
+     "director":null,
+     "cast":"Paul Boyton",
+     "genre":null}
+]
+#+END_SRC
+
+#+BEGIN_SRC txt :tangle data/person.xml
+<persons>
+  <person>
+    <firstName>John</firstName>
+    <lastName>Smith</lastName>
+    <age>25</age>
+    <address>
+      <streetAddress>21 2nd Street</streetAddress>
+      <city>New York</city>
+      <state>NY</state>
+    <postalCode>10021</postalCode>  </address>
+    <phoneNumbers>
+      <phoneNumber type="home">212 555-1234</phoneNumber>
+    <phoneNumber type="fax">646 555-4567</phoneNumber>  </phoneNumbers>
+    <gender>
+      <type>male</type>
+    </gender>
+  </person>
+  <person>
+    <firstName>Jimy</firstName>
+    <lastName>Liar</lastName>
+    <age>19</age>
+    <address>
+      <streetAddress>18 2nd Street</streetAddress>
+      <city>New York</city>
+      <state>NY</state>
+    <postalCode>10021</postalCode>  </address>
+    <phoneNumbers>
+    <phoneNumber type="home">212 555-1234</phoneNumber>  </phoneNumbers>
+    <gender>
+      <type>male</type>
+    </gender>
+  </person>
+  <person>
+    <firstName>Patty</firstName>
+    <lastName>Liar</lastName>
+    <age>20</age>
+    <address>
+      <streetAddress>18 2nd Street</streetAddress>
+      <city>New York</city>
+      <state>NY</state>
+    <postalCode>10021</postalCode>  </address>
+    <phoneNumbers>
+      <phoneNumber type="home">212 555-1234</phoneNumber>
+    <phoneNumber type="mobile">001 452-8819</phoneNumber>  </phoneNumbers>
+    <gender>
+      <type>female</type>
+    </gender>
+  </person>
+</persons>
+#+END_SRC
+
+#+BEGIN_SRC python :tangle factory_method.py
+import json
+import xml.etree.ElementTree as etree
+
+class JSONDataExtractor:
+    """
+    parses a JSON file and returns all data as a dictionary
+    """
+    def __init__(self, filepath):
+        self.data = dict()
+        with open(filepath, mode='r', encoding='utf-8') as f:
+            self.data = json.load(f)
+
+    @property
+    def parsed_data(self):
+        return self.data
+
+
+class XMLDataExtractor:
+    """
+    Parses an XML file and returns all data as a list of xml.etree.Element
+    """
+    def __init__(self, filepath):
+        self.tree = etree.parse(filepath)
+
+    @property
+    def parsed_data(self):
+        return self.tree
+
+
+def dataextraction_factory(filepath):
+    """
+    A factory method that returns an instance of JSONDataExtractor or XMLDataExtractor
+    """
+    if filepath.endswith('json'):
+        extractor = JSONDataExtractor
+    elif filepath.endswith('xml'):
+        extractor = XMLDataExtractor
+    else:
+        raise ValueError(f"Cannot extract data from {filepath}")
+    return extractor(filepath)
+
+
+def extract_data_from(filepath):
+    factory_obj = None
+    try:
+        factory_obj = dataextraction_factory(filepath)
+    except ValueError as e:
+        print(e)
+        raise
+    return factory_obj
+
+
+def pma(attribute: str, data_struct_getter):
+    """prints a movie attribute if it exists"""
+    att = data_struct_getter(attribute)
+    if att:
+        print(f"{attribute.capitalize()}:\t{att}")
+    return att
+
+
+def xml_find(ds):
+    return lambda x: ds.find(x).text
+
+
+if __name__ == '__main__':
+    # json
+    print("Testing JSON Extraction")
+    json_data = extract_data_from('data/movies.json').parsed_data
+    print(f"Found:\t{len(json_data)} movies")
+    print("---------------------------------\n")
+    for movie in json_data:
+        print(f"Title:\t{movie['title']}")
+        pma("year", movie.get)
+        pma("director", movie.get)
+        pma("genre", movie.get)
+
+    print("Testing XML Extraction")
+    xml_data = extract_data_from('data/person.xml').parsed_data
+    liars = xml_data.findall(f".//person[lastName='Liar']")
+    print(f"Found:\t{len(liars)} people")
+    for liar in liars:
+        pma("firstName", xml_find(liar))
+        pma("lastName", xml_find(liar))
+        pma("phoneNumbers", xml_find(liar))
+#+END_SRC
+
+#+BEGIN_SRC python :tangle test_factory_method.py
+import pytest
+from factory_method import extract_data_from
+
+# test with exception
+def test_exception_for_wrong_filetype():
+    with pytest.raises(ValueError):
+        extract_data_from('data/person.sq3')
+
+
+# test with json
+def test_json_extraction():
+    json_data = extract_data_from('data/movies.json').parsed_data
+    assert len(json_data) == 9
+
+
+# test with xml
+def test_xml_extraction():
+    xml_data = extract_data_from('data/person.xml').parsed_data
+    liars = xml_data.findall(f".//person[lastName='Liar']")
+    assert len(liars) == 2
+#+END_SRC
+
+* The Abstract Factory
