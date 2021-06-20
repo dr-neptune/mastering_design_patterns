@@ -70,7 +70,7 @@ and tracking your objects becomes much easier.
 ]
 #+END_SRC
 
-#+BEGIN_SRC txt :tangle data/person.xml
+#+BEGIN_SRC xml :tangle data/person.xml
 <persons>
   <person>
     <firstName>John</firstName>
