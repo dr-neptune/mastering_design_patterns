@@ -233,3 +233,125 @@ def test_xml_extraction():
 #+END_SRC
 
 * The Abstract Factory
+
+The abstract factory design pattern is a generalization of the factory method. Basically, an abstract factory is a logical group of factory methods, where each factory method is responsible for generating a different kind of object.
+
+We usually start with the factory method. If we find our application requires many factory methods, in which it makes sense to combine to create a family of objects, we end up with an abstract factory. A benefit from the users point of view is that we can dynamically (at run-time) change the behavior of an application by swapping out the abstract factory. An example is changing the look and feel of an operating system.
+
+* Implementing the Abstract Factory Pattern
+
+Imagine we are making a game and we want to include a minigame within it. Furthermore, we wish to show a specific minigame based on the inut a user provides about their age. We want to include at least 2 games, one for children and one for adults. We will decide which game to create and launch at runtime.
+
+
+#+BEGIN_SRC python :tangle frogworld.py
+# kids game: Frogworld
+class Frog:
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return self.name
+
+    def interact_with(self, obstacle):
+        act = obstacle.action()
+        print(f"{self} the Frog encounters {obstacle} and {act}!")
+
+
+class Bug:
+    def __str__(self):
+        return "a bug"
+
+    def action(self):
+        return "eats it"
+
+
+# Abstract Factory
+# keeps the creation methods separate and their names generic
+# so we can change things dynamically without any code changes
+class FrogWorld:
+    def __init__(self, name):
+        print(self)
+        self.player_name = name
+
+    def __str__(self):
+        return "\n\n\t----- Frog World -----"
+
+    def make_character(self):
+        return Frog(self.player_name)
+
+    def make_obstacle(self):
+        return Bug()
+#+END_SRC
+
+
+#+BEGIN_SRC python :tangle wizardworld.py
+# Wizard Game
+class Wizard:
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return self.name
+
+    def interact_with(self, obstacle):
+        act = obstacle.action()
+        print(f"{self} the Wizard battles against {obstacle} and {act}!")
+
+
+class Orc:
+    def __str__(self):
+        return "an orc with a lot of introspection into what they are doing"
+
+    def action(self):
+        return "kills it"
+
+
+class WizardWorld:
+    def __init__(self, name):
+        print(self)
+        self.player_name = name
+
+    def __str__(self):
+        return "\n\n\t----- Wizard World -----"
+
+    def make_character(self):
+        return Wizard(self.player_name)
+
+    def make_obstacle(self):
+        return Orc()
+#+END_SRC
+
+#+BEGIN_SRC python :tangle gameworld.py
+from wizardworld import WizardWorld
+from frogworld import FrogWorld
+
+class GameEnvironment:
+    def __init__(self, factory):
+        self.hero = factory.make_character()
+        self.obstacle = factory.make_obstacle()
+
+    def play(self):
+        self.hero.interact_with(self.obstacle)
+
+
+def validate_age(name):
+    try:
+        age = int(input(f"Welcome {name}. How old are you?  "))
+    except ValueError as err:
+        print(f"Age {age} is invalid, please try again.")
+        return False, age
+    return True, age
+
+
+def main():
+    name = input("Hello. What is your name?  ")
+    valid_input = False
+    while not valid_input:
+        valid_input, age = validate_age(name)
+    game = FrogWorld if age < 18 else WizardWorld
+    environment = GameEnvironment(game(name))
+    environment.play()
+
+if __name__ == '__main__':
+    main()
+#+END_SRC
