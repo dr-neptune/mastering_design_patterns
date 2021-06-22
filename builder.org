@@ -105,7 +105,192 @@ if __name__ == '__main__':
 
 We will be building a pizza-ordering application.
 
-#+BEGIN_SRC python
+#+BEGIN_SRC python :tangle pizza_builder.py
 from enum import Enum
 import time
+
+PizzaProgress = Enum('PizzaProgress', 'queued preparation baking ready')
+PizzaDough = Enum('PizzaDough', 'thin thick')
+PizzaSauce = Enum('PizzaSauce', 'tomato arrabiata')
+PizzaTopping = Enum('PizzaTopping', 'mozzarella double_mozzarella bacon ham mushrooms red_onion oregano')
+STEP_DELAY = 3  # in seconds
+
+class Pizza:
+    def __init__(self, name):
+        self.name = name
+        self.dough = None
+        self.sauce = None
+        self.topping = []
+
+    def __str__(self):
+        return self.name
+
+    def prepare_dough(self, dough):
+        self.dough = dough
+        print(f"preparing the {self.dough.name} dough of your {self}")
+        time.sleep(STEP_DELAY)
+        print(f"Done with the {self.dough.name} dough")
+
+
+# Builders
+class MargaritaBuilder:
+    def __init__(self):
+        self.pizza = Pizza("Margarita")
+        self.progress = PizzaProgress.queued
+        self.baking_time = 5
+
+    def prepare_dough(self):
+        self.progress = PizzaProgress.preparation
+        self.pizza.prepare_dough(PizzaDough.thin)
+
+    def add_sauce(self):
+        print("Adding the tomato sauce to your margarita")
+        self.pizza.sauce = PizzaSauce.tomato
+        time.sleep(STEP_DELAY)
+        print("Done with the tomato sauce")
+
+    def add_topping(self):
+        topping_desc = "double mozzarella, oregano"
+        topping_items = (PizzaTopping.double_mozzarella, PizzaTopping.oregano)
+        print(f"Adding the topping ({topping_desc}) to your margarita")
+        self.pizza.topping.append([t for t in topping_items])
+        time.sleep(STEP_DELAY)
+        print(f"Done with the topping ({topping_desc})")
+
+    def bake(self):
+        self.progress = PizzaProgress.baking
+        print(f"Baking your margarita for {self.baking_time} seconds")
+        time.sleep(self.baking_time)
+        self.progress = PizzaProgress.ready
+        print("Your margarita pizza is ready")
+
+
+class VeganBaconBuilder:
+    def __init__(self):
+        self.pizza = Pizza("Vegan Bacon")
+        self.progress = PizzaProgress.queued
+        self.baking_time = 7
+
+    def prepare_dough(self):
+        self.progress = PizzaProgress.preparation
+        self.pizza.prepare_dough(PizzaDough.thick)
+
+    def add_sauce(self):
+        print("Adding the Arrabiata sauce to your vegan bacon pizza")
+        self.pizza.sauce = PizzaSauce.arrabiata
+        time.sleep(STEP_DELAY)
+        print("Done with the Arrabiata sauce")
+
+    def add_topping(self):
+        topping_desc = "mozzarella, bacon, mushrooms, oregano"
+        topping_items = (PizzaTopping.mozzarella,
+                         PizzaTopping.bacon,
+                         PizzaTopping.mushrooms,
+                         PizzaTopping.oregano)
+        print(f"Adding the topping(s) ({topping_desc}) to your vegan bacon")
+        self.pizza.topping.append([t for t in topping_items])
+        time.sleep(STEP_DELAY)
+        print(f"Done with the topping(s) ({topping_desc})")
+
+    def bake(self):
+        self.progress = PizzaProgress.baking
+        print(f"Baking your vegan bacon for {self.baking_time} minutes")
+        time.sleep(self.baking_time)
+        self.progress = PizzaProgress.ready
+        print("Your vegan bacon pizza is ready")
+
+# directory for builders
+class Waiter:
+    def __init__(self):
+        self.builder = None
+
+    def construct_pizza(self, builder):
+        self.builder = builder
+        steps = (builder.prepare_dough,
+                 builder.add_sauce,
+                 builder.add_topping,
+                 builder.bake)
+        [step() for step in steps]
+
+    @property
+    def pizza(self):
+        return self.builder.pizza
+
+
+# validate input data
+def validate_style(builders):
+    try:
+        input_msg = "What pizza would you like? [m]argarita or [v]egan bacon?"
+        pizza_style = input(input_msg)
+        builder = builders[pizza_style]()
+        valid_input = True
+    except KeyError:
+        print("Sorry, only Margarita (key m) and Vegan Bacon (key v) are available")
+        return False, None
+    return True, builder
+
+
+def main():
+    builders = dict(m=MargaritaBuilder,
+                    v=VeganBaconBuilder)
+    valid_input = False
+    while not valid_input:
+        valid_input, builder = validate_style(builders)
+    waiter = Waiter()
+    waiter.construct_pizza(builder)
+    pizza = waiter.pizza
+    print(f"Enjoy your {pizza}")
+
+
+if __name__ == '__main__':
+    main()
 #+END_SRC
+
+In the book Effective Java by Joshua Bloch, a variation of the builder pattern called the fluent builder is described in which the calls to builder methods are chained.
+
+This is accomplished by defining the builder itself as an inner class and returning itself from each of the setter like methods on it.
+The build() method returns the final object. Here is a python implementation:
+
+#+BEGIN_SRC python :tangle pizza_fluent.py
+class Pizza:
+    def __init__(self, builder):
+        self.garlic = builder.garlic
+        self.extra_cheese = builder.extra_cheese
+
+    def __str__(self):
+        garlic = "yes" if self.garlic else "no"
+        cheese = "yes" if self.extra_cheese else "no"
+        info = f"Garlic: {garlic}", f"Extra Cheese: {cheese}"
+        return "\n".join(info)
+
+    class PizzaBuilder:
+        def __init__(self):
+            self.extra_cheese = False
+            self.garlic = False
+
+        def add_garlic(self):
+            self.garlic = True
+            return self
+
+        def add_extra_cheese(self):
+            self.extra_cheese = True
+            return self
+
+        def build(self):
+            return Pizza(self)
+
+if __name__ == '__main__':
+    pizza = (Pizza.PizzaBuilder()
+             .add_garlic()
+             .add_extra_cheese()
+             .build())
+    print(pizza)
+#+END_SRC
+
+* Summary
+
+A builder is usually a better candidate than a factory pattern when the following applies:
+
+- We want to create a complex object (an object composed of many parts and created in different steps that might need to follow a specific order)
+- Different representations of an object are required, and we want to keep the construction of an object coupled from its representation
+- We want to create an object at one point in time, but access it at a later point
