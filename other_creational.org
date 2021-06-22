@@ -1,1 +1,99 @@
 #+TITLE: Other Creational Patterns
+
+In this chapter we will look at:
+- The *prototype* pattern
+
+This lets you create an object based on an existing object by using a cloning technique
+
+- The *singleton* pattern
+
+This lets you implement a class in which you can only create one object
+
+* The Prototype Pattern
+
+The prototype pattern helps us with creating object clones. In its simplest version,
+this pattern is just a clone() function that accepts an object as an input parameter and returns
+a clone of it. In Python, this can be done using the copy.deepcopy() function.
+
+* Implementation
+
+#+BEGIN_SRC python :tangle prototype.py
+import copy
+
+class Website:
+    def __init__(self, name, domain, description, author, **kwargs):
+        """
+        Examples of optional attributes (kwargs)
+        category, creation_date, technologies, keywords
+        """
+        self.name = name
+        self.domain = domain
+        self.description = description
+        self.author = author
+        for key in kwargs:
+            setattr(self, key, kwargs[key])
+
+    def __str__(self):
+        summary = [f"Website: {self.name}\n",]
+        info = sorted(vars(self).items())
+        for attr, val in info:
+            if attr == "name":
+                continue
+            summary.append(f"{attr}: {val}\n")
+        return "".join(summary)
+
+
+web = Website("hello.world", "world", "A website dedicated to the best possible program", "HAL-9000")
+
+print("\n", web)
+
+
+class Prototype:
+    def __init__(self):
+        self.objects = dict()
+
+    def register(self, identifier, obj):
+        self.objects[identifier] = obj
+
+    def unregister(self, identifier):
+        del self.objects[identifier]
+
+    def clone(self, identifier, **attrs):
+        found = self.objects.get(identifier)
+        if not found:
+            raise ValueError(f"Incorrect Object Identifier: {identifier}")
+        obj = copy.deepcopy(found)
+        for key in attrs:
+            setattr(obj, key, attrs[key])
+        return obj
+
+
+def main():
+    keywords = ("python", "data", "apis", "automation")
+    site1 = Website("dataism",
+                    domain="dataism.data",
+                    description="data and dada",
+                    author="who knows",
+                    category="blog",
+                    keywords=keywords)
+
+    # instantiate the prototype
+    prototype = Prototype()
+    identifier = "ka-cg-1"
+    prototype.register(identifier, site1)
+    site2 = prototype.clone(identifier,
+                            name="dataism_playground",
+                            domain="play.dataism.data",
+                            description="experimentation for techniques featured on the blog",
+                            category="membership site",
+                            creation_date="9999-99-99")
+
+    for site in (site1, site2):
+        print(site)
+    print(f"ID site1: {id(site1)} != ID site2: {id(site2)}")
+
+if __name__ == '__main__':
+    main()
+#+END_SRC
+
+* Singleton
