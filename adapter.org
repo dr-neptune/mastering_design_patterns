@@ -1,0 +1,3 @@
+#+TITLE: The Adapter Pattern
+
+The next category of patterns we will look at are structural design patterns (as opposed to creational patterns).

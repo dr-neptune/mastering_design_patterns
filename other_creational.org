@@ -97,3 +97,70 @@ if __name__ == '__main__':
 #+END_SRC
 
 * Singleton
+
+The singleton pattern restricts the instantiation of a class to one object, which is useful when you need one object to coordinate actions for the system.
+
+It is useful when you need to create only one object or you need some sort of object capable of maintaining a global state for your program.
+
+Other possible use cases:
+- Controlling concurrent access to a shared resource. For example, the class managing the connection to a database
+- A service or resource that is transversal in the sense that it can be accessed from different parts of the application or by different users and do its work.
+  For example, the class at the core of the logging system or utility.
+
+* Implementation
+
+Let's implement a program to fetch content from web pages.
+We want to be able to track the list of web pages that were tracked, hence the use of the singleton pattern. We want a single object to maintain the global state
+
+#+BEGIN_SRC python :tangle pyfetch.py
+import urllib.parse
+import urllib.request
+
+class SingletonType(type):
+    _instances = {}
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(SingletonType, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]
+
+
+class URLFetcher(metaclass=SingletonType):
+    def __init__(self):
+        self.urls = []
+
+    def fetch(self, url):
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req) as response:
+            if response.code == 200:
+                the_page = response.read()
+                print(the_page)
+                self.urls.append(url)
+                # urls = self.urls
+                # urls.append(url)
+                # self.urls = urls
+                print(self.urls)
+
+    def dump_url_registry(self):
+        return ", ".join(self.urls)
+
+
+def main():
+    MY_URLS = ["https://duckduckgo.com",
+               "https://guix.gnu.org",
+               "https://python.org"]
+
+    print(URLFetcher() is URLFetcher())
+
+    fetcher = URLFetcher()
+    for url in MY_URLS:
+        try:
+            fetcher.fetch(url)
+        except Exception as e:
+            print(e)
+    print("--------")
+    done_urls = fetcher.dump_url_registry()
+    print(f"Done URLs: {done_urls}")
+
+if __name__ == '__main__':
+    main()
+#+END_SRC
