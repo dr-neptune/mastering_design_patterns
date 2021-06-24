@@ -1,0 +1,1 @@
+#+TITLE: The Bridge Pattern
