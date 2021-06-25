@@ -1,0 +1,6 @@
+#+TITLE: Other Structural Patterns
+
+In this chapter, we will discuss the following structural patterns:
+- The flyweight pattern
+- The MVC pattern
+- The Proxy Pattern
