@@ -99,7 +99,7 @@ The *controller* is the link/glue between the model and view. All communication 
 
 We will implement MVC using a quote printer as an example. The user enters a number and sees the quote related to that number.
 
-#+BEGIN_SRC python
+#+BEGIN_SRC python :tangle mvc.py
 quotes = (
     'A man is not complete until he is married. Then he is finished.',
     'As I said before, I never repeat myself.',
@@ -107,4 +107,113 @@ quotes = (
     'Black holes really suck...',
     'Facts are stubborn things.'
 )
+
+
+class QuoteModel:
+    '''
+    The model for the quote system
+    '''
+    def get_quote(self, n):
+        try:
+            value = quotes[n]
+        except IndexError as err:
+            value = 'Not Found!'
+        return value
+
+
+class QuoteTerminalView:
+    '''
+    The front end, or view
+    '''
+    def show(self, quote):
+        print(f'The quote is:\t "{quote}"')
+
+    def error(self, msg):
+        print(f'Error:\t{msg}')
+
+    def select_quote(self):
+        return input('Which quote number would you like to see? ')
+
+
+class QuoteTerminalController:
+    '''
+    The glue that pulls the model and the view together
+    '''
+    def __init__(self):
+        self.model = QuoteModel()
+        self.view = QuoteTerminalView()
+
+    def run(self):
+        valid_input = False
+        while not valid_input:
+            try:
+                n = self.view.select_quote()
+                n = int(n)
+                valid_input = True
+            except ValueError as err:
+                self.view.error(f'Incorrect index "{n}"')
+        quote = self.model.get_quote(n)
+        self.view.show(quote)
+
+
+def main():
+    controller = QuoteTerminalController()
+    while True:
+        controller.run()
+
+
+if __name__ == '__main__':
+    main()
+#+END_SRC
+
+* The Proxy Pattern
+
+There are 4 well known proxy types:
+- A *remote proxy*, which acts as the local representation of an object that really exists in a different address space (for example, a network server)
+- A *virtual proxy*, which uses lazy initialization to defer the creation of a computationally expensive object until the moment it is actually needed
+- A *protection/protective* proxy, which controls access to a sensitive object
+- A *smart (reference) proxy*, which performs extra actions when an object is accessed. Examples of such actions are reference counting and thread-safety checks
+
+#+BEGIN_SRC python :tangle lazyproperty.py
+class LazyProperty:
+    def __init__(self, method):
+        self.method = method
+        self.method_name = method.__name__
+        print(f'function overridden: {self.method}')
+        print(f'functions name: {self.method_name}')
+
+    def __get__(self, obj, cls):
+        if not obj:
+            return None
+        value = self.method(obj)
+        print(f"value {value}")
+        setattr(obj, self.method_name, value)
+        return value
+
+
+# there are 3 attributes: x, y, and _resource. We want _resource to be loaded lazily, so we initialize it to None
+class Test:
+    def __init__(self):
+        self.x = 'foo'
+        self.y = 'bar'
+        self._resource = None
+
+    @LazyProperty
+    def resource(self):
+        print(f'Initializing self._resource: {self._resource}')
+        self._resource = tuple(range(5))
+        return self._resource
+
+
+def main():
+    t = Test()
+    print(t.x)
+    print(t.y)
+    # do more work
+    print(t.resource)
+    print(t.resource)
+
+
+if __name__ == '__main__':
+    main()
 #+END_SRC
