@@ -1,0 +1,1 @@
+#+TITLE: The Chain of Responsibility Pattern
