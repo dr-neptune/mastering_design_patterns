@@ -1,1 +1,104 @@
 #+TITLE: The Observer Pattern
+
+The Observer pattern describes a publish-subscribe relationship between a single object, aka the subject or observable, and one or more objects, aka observers.
+
+We want to increase decoupling between the publisher and subscribers, and to make it easy to add/remove subscribers at runtime.
+We generally use the Observer pattern when we want to inform/update one or more objects about a change that happened on a given object.
+Event-driven systems are another example where Observer is usually used. In such systems, you have listeners that listen for specific events.
+The listeners are triggered when an event they are listening to is created.
+
+* Implementation
+
+In this section we will implement a data formatter. There is a default formatter that shows a value in decimal format. However, we can add/register more formatters. In this example, we will add a hex and binary formatter. Every time the value of the default formatter is updated, the registered formatters
+are notified and take action. In this case, the action is to show the new value in a relevant format.
+
+#+BEGIN_SRC python :tangle observer.py
+class Publisher:
+    def __init__(self):
+        self.observers = []
+
+    def add(self, observer):
+        if observer not in self.observers:
+            self.observers.append(observer)
+        else:
+            print(f"Failed to add: {observer}")
+
+    def remove(self, observer):
+        try:
+            self.observers.remove(observer)
+        except ValueError:
+            print(f"Failed to add: {observer}")
+
+    def notify(self):
+        [o.notify(self) for o in self.observers]
+
+
+class DefaultFormatter(Publisher):
+    def __init__(self, name):
+        Publisher.__init__(self)
+        self.name = name
+        # this shouldn't be accessed directly
+        self._data = 0
+
+    def __str__(self):
+        return f"{type(self).__name__}: '{self.name}' has data = {self._data}"
+
+    @property
+    def data(self):
+        return self._data
+
+    @data.setter
+    def data(self, new_value):
+        try:
+            self._data = int(new_value)
+        except ValueError as e:
+            print(f"Error: {e}")
+        else:
+            self.notify()
+
+
+class HexFormatterObs:
+    def notify(self, publisher):
+        value = hex(publisher.data)
+        print(f"{type(self).__name__}: '{publisher.name}' now has hex data = {value}")
+
+
+class BinaryFormatterObs:
+    def notify(self, publisher):
+        value = bin(publisher.data)
+        print(f"{type(self).__name__}: '{publisher.name}' now has bin data = {value}")
+
+
+def main():
+    # instantiate objects
+    df = DefaultFormatter('test1')
+    hf = HexFormatterObs()
+    bf = BinaryFormatterObs()
+
+    # test observers
+    print(df)
+    df.add(hf)
+    df.data = 3
+    print(df)
+
+    df.add(bf)
+    df.data = 21
+    print(df)
+
+    # test adding and removing observers
+    df.remove(hf)
+    df.data = 40
+    print(df)
+
+    df.remove(hf)
+    df.add(bf)
+    df.data = "hello"
+    print(df)
+
+    df.data = 15.8
+    print(df)
+
+
+if __name__ == '__main__':
+    main()
+#+END_SRC
