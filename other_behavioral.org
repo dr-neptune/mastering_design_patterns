@@ -1,1 +1,84 @@
 #+TITLE: Other Behavioral Patterns
+
+In this chapter we will look at 5 behavioral patterns:
+
+- Interpreter
+  - Give the ability to use an embedded little language inside of an application
+- Strategy
+  - Given multiple algorithms for a problem, decide which algorithm to use
+- Memento
+  - Add support for Undo and/or History in an application
+- Iterator
+  - Handle a container of objects and traverse the members one at a time with next semantics
+- Template
+  - Eliminate code redundancy by redefining certain parts of an algorithm without changing its structure
+
+* Interpreter Pattern
+
+The goal is to offer the right programming abstractions to the specialist, who is often not a programmer, to make them productive.
+
+* Implementation
+
+We will create an internal DSL to control a smart house.
+The user is able to control things using a very simple event notation. An event has the form of
+command -> receiver -> arguments
+Not all events require arguments. Example:
+open -> gate
+increase -> boiler temperature -> 3 degrees
+
+
+Before we code, we can define the grammar using Backus-Naur Form notation:
+
+#+BEGIN_SRC backus-naur-form
+event ::= command token receiver token arguments
+word ::= a collection of one or more alphanumeric characters
+token ::= ->
+command ::= word+
+receiver ::= word+
+arguments ::= word+
+#+END_SRC
+
+
+#+BEGIN_SRC python :tangle boiler_interpreter.py
+import pyparsing as pyp
+
+# implement BNF
+word = pyp.Word(pyp.alphanums)
+token = pyp.Suppress("->")
+
+command = pyp.Group(pyp.OneOrMore(word))
+device = pyp.Group(pyp.OneOrMore(word))
+argument = pyp.Group(pyp.OneOrMore(word))
+
+event = command + token + device + pyp.Optional(token + argument)
+
+class Boiler:
+    def __init__(self):
+        self.temperature = 83
+
+    def __str__(self):
+        return f"Boiler temperature: {self.temperature}"
+
+    def increase_temperature(self, amount):
+        print(f"Increasing the boiler's temperature by {amount} degrees (C)")
+        self.temperature += amount
+
+    def decrease_temperature(self, amount):
+        print(f"Decreasing the boiler's temperature by {amount} degrees (C)")
+        self.temperature -= amount
+
+boiler = Boiler()
+
+def main():
+    cmd, dev, arg = event.parseString("increase -> boiler temperature -> 3 degrees")
+    cmd_str = " ".join(cmd)
+    dev_str = " ".join(dev)
+
+    if "increase" in cmd_str and "boiler" in dev_str:
+        boiler.increase_temperature(int(arg[0]))
+    print(boiler)
+
+
+if __name__ == '__main__':
+    main()
+#+END_SRC
