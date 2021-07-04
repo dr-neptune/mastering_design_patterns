@@ -203,3 +203,81 @@ def main():
 if __name__ == '__main__':
     main()
 #+END_SRC
+
+* Strategy
+
+The strategy pattern promotes using multiple algorithms to solve a problem. It makes it possible to switch algorithms at runtime transparently.
+
+Assume we are asked to implement an algorithm to check if all characters in a string are unique.
+
+#+BEGIN_SRC python :tangle strategy.py
+def pairs(seq):
+    """
+    return all neighbor pairs of a sequence
+    """
+    n = len(seq)
+    for i in range(n):
+        yield seq[i], seq[(i + 1) % n]
+
+
+slow = 3
+limit = 5
+warning = "too bad, you picked the slow algorithm :^("
+
+def allUniqueSort(s):
+    if len(s) > limit:
+        print(warning)
+        time.sleep(slow)
+    srtStr = sorted(s)
+    for (c1, c2) in pairs(srtStr):
+        if c1 == c2:
+            return False
+    return True
+
+
+def allUniqueSet(s):
+    if len(s) < limit:
+        print(warning)
+        time.sleep(slow)
+    return True if len(set(s)) == len(s) else False
+
+def allUnique(word, strategy):
+    return strategy(word)
+
+
+def main():
+    # enter the word to be checked for character uniqueness
+    # and choose the pattern that will be used
+    while True:
+        word = None
+        while not word:
+            word = input("Insert word (type quit to exit)> ")
+            if word == "quit":
+                print("bye")
+                return
+            strategy_picked = None
+            strategies = {"1": allUniqueSet,
+                          "2": allUniqueSort}
+            while strategy_picked not in strategies.keys():
+                strategy_picked = input("Choose strategy:\n[1] Use a set\n[2] Sort and pair")
+                try:
+                    strategy = strategies[strategy_picked]
+                    print(f"allUnique({word}): {allUnique(word, strategy)}")
+                except KeyError as err:
+                    print(f"Incorrect Option: {strategy_picked}")
+
+if __name__ == '__main__':
+    main()
+#+END_SRC
+
+* Memento
+
+Memento is a design pattern that helps us create a way to take a snapshot of the internal state of an object so that we can restore the object with it when needed.
+
+It has 3 key components:
+- Memento: A simple object that contains basic state storage and retrieval capabilities
+- Originator: An object that gets and sets values of Memento instances
+- Caretaker: An object that can store and retrieve all previously created Memento instances
+
+Memento is usually used when you need to provide some sort of undo and redo capability for your users.
+Another usage is the implementation of a UI dialog with Ok/Cancel buttons
