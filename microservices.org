@@ -1,0 +1,259 @@
+#+TITLE: Microservices and Patterns for the Cloud
+
+In this chapter, we discuss the following patterns:
+
+- The Retry Pattern
+- The Circuit Breaker Pattern
+- The Cache-Aside Pattern
+- The Throttling Pattern
+
+* Use Cases
+
+We can use a microservice architecture-based design every time we are building an application that has at least one of the following characteristics:
+
+- There is a requirement to support different clients, i.e. desktop and mobile
+- There is an API for third parties to consume
+- We have to communicate with other applications using messaging
+- We have to serve requests by accessing a database, communicating with other systems, and returning the right type of response (JSON, HTML, XML, others)
+- There are logical components corresponding to different functional areas of the application
+
+* Implementation
+
+We will discuss 2 small examples of service implementation:
+
+- A service that can return a list of people names when called
+- A service that calls the first one and appends the names obtained as a result to a CSV file on disk
+
+#+BEGIN_SRC python :tangle service_first.py
+from nameko.rpc import rpc
+from faker import Faker
+
+fake = Faker()
+
+
+class PeopleListService:
+    name = "peoplelist"
+
+    @rpc
+    def populate(self, number=20):
+        names = []
+        for _ in range(0, number):
+            n = fake.name()
+            names.append(n)
+        return names
+#+END_SRC
+
+
+#+BEGIN_SRC python :tangle test_service_first.py
+from nameko.testing.services import worker_factory
+from service_first import PeopleListService
+
+
+def test_people():
+    service_worker = worker_factory(PeopleListService)
+    result = service_worker.populate()
+    for name in result:
+        print(name)
+
+
+if __name__ == '__main__':
+    test_people()
+#+END_SRC
+
+
+* A Second Example
+
+We will reuse the idea of a toy service that helps produce a list of people.
+Now we want the first name, last name, and the address of people. We will have
+a second service that depends on the first one to call it in order to get a list
+of people and then save that list on disk. Since our service B depends on service A
+we will use the RpcProxy class.
+
+#+BEGIN_SRC python :tangle service_second.py
+from nameko.rpc import rpc, RpcProxy
+from faker import Faker
+import csv
+
+fake = Faker()
+
+class PeopleListService:
+    name = "peoplelist"
+
+    @rpc
+    def populate(self, number=20):
+        persons = []
+        for _ in range(0, number):
+            p = {'firstname': fake.first_name(),
+                 'lastname': fake.last_name(),
+                 'address': fake.address()}
+            persons.append(p)
+        return persons
+
+class PeopleDataPersistenceService:
+    name = "people_data_persistence"
+    peoplelist_rpc = RpcProxy("peoplelist")
+
+    @rpc
+    def save(self, filename):
+        persons = self.peoplelist_rpc.populate(number=25)
+
+        with open(filename, "a", newline="") as csv_file:
+            fieldnames = ["firstname", "lastname", "address"]
+            writer = csv.DictWriter(csv_file,
+                                    fieldnames=fieldnames,
+                                    delimiter=";")
+            for p in persons:
+                writer.writerow(p)
+
+        return f"Saved data for {len(persons)} new people"
+#+END_SRC
+
+
+#+BEGIN_SRC python :tangle test_service_second.py
+from nameko.testing.services import worker_factory
+from nameko.standalone.rpc import ClusterRpcProxy
+from service_second import PeopleDataPersistenceService
+
+config = {"AMQP_URI": "pyamqp://guest:guest@127.0.0.1"}
+
+def test_peopledata_persist():
+    with ClusterRpcProxy(config) as cluster_rpc:
+        out = cluster_rpc.people_data_persistence.save.call_async("people.csv")
+        print(out.result())
+
+if __name__ == '__main__':
+    test_peopledata_persist()
+#+END_SRC
+
+* The Retry Pattern
+
+Parts of a cloud-native application may experience what is called transient fauls or failures, meaning some mini issues can look like bugs, but they are not due to your application itself. Instead they are due to constraints outside of your control such as the networking or the external server/service performance. As a result, the application may dysfunction and hang. The answer to this risk is to put in place some retry logic.
+
+The retrying approach is recommended to alleviate the impact of identified transient failrues while communicating with an external component or service due to network failure or server overload. It is not recommended for handling failures such as internal exceptions caused by errors in the application logic itself. We also must address the way the server responds. If the application experiences frequent busy faults, then its a sign that the service being accessed has a scaling issue that should be addressed.
+
+* A First Example
+
+Suppose we want to write and update a file using two different programs. Instead of creating two scripts, we can instead create a single script that can be called by an argument to indicate what we want to do: create the file, or update it.
+
+#+BEGIN_SRC python :tangle retry_1.py
+import time
+import sys
+import os
+
+def create_file(filename, after_delay=5):
+    time.sleep(after_delay)
+
+    with open(filename, "w") as f:
+        f.write("A file creation test")
+
+def append_data_to_file(filename):
+    if os.path.exists(filename):
+        with open(filename, "a") as f:
+            f.write("\tUpdating the file")
+    else:
+        raise OSError
+
+FILENAME = 'file1.txt'
+
+if __name__ == '__main__':
+    args = sys.argv
+
+    if args[1] == "create":
+        create_file(FILENAME)
+        print(f"Created file '{FILENAME}'")
+    elif args[1] == "update":
+        while True:
+            try:
+                append_data_to_file(FILENAME)
+                print("Success! We are done!")
+                break
+            except OSError as e:
+                print("Error.\tTry Again!")
+#+END_SRC
+
+* A Second Example
+
+Using the retrying library
+
+#+BEGIN_SRC python :tangle retry_2.py
+import time
+import sys
+import os
+from retrying import retry
+
+
+def create_file(filename, after_delay=5):
+    time.sleep(after_delay)
+
+    with open(filename, "w") as f:
+        f.write("A file creation test")
+
+@retry
+def append_data_to_file(filename):
+    if os.path.exists(filename):
+        print("Got the file -- let's proceed!")
+        with open(filename, "a") as f:
+            f.write("\tUpdating the file")
+        return "okie dokie, artichokey"
+    else:
+        print("Error: Missing File. Retrying")
+        raise OSError
+
+FILENAME = 'file2.txt'
+
+if __name__ == '__main__':
+    args = sys.argv
+
+    if args[1] == "create":
+        create_file(FILENAME)
+        print(f"Created file '{FILENAME}'")
+    elif args[1] == "update":
+        while True:
+            out = append_data_to_file(FILENAME)
+            if out == "okie dokie, artichokey":
+                print("Success! We are done!")
+                break
+#+END_SRC
+
+* The Circuit Breaker Pattern
+
+With the circuit breaker pattern, you wrap a fragile function call (or an integration point with an external service) in a special (circuit breaker) object, which monitors for failures. Once the failures reach a certain threshold, the circuit breaker trips, and all further calls to the circuit breaker return with an error, without the protected call being made at all.
+
+We use this pattern when we need a component to be fault-tolerant to long-lasting failures when communicating with an external component, service, or resource.
+
+* Implementation
+
+Let's say we wish to use a circuit breaker on a flaky function (for example, fragile due to the networking environment it depends on.)
+
+#+BEGIN_SRC python :tangle circuit.py
+import random
+import pybreaker
+from time import sleep
+from datetime import datetime
+
+breaker = pybreaker.CircuitBreaker(fail_max=2, reset_timeout=5)
+
+@breaker
+def fragile_function():
+    if not random.choice([True, False]):
+        print(" / OK\n", end="")
+    else:
+        print(" / FAIL\n", end="")
+        raise Exception("This is a sample exception\n")
+
+
+if __name__ == '__main__':
+
+    while True:
+        print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), end="")
+        try:
+            fragile_function()
+        except Exception as e:
+            print(" / {} {}".format(type(e), e), end="")
+        finally:
+            sleep(1)
+#+END_SRC
+
+* The Cache-Aside Pattern
+
+In situations where data is more frequently read than updated, applications use a cache to optimize repeated access to information stored in a database or data store. In some systems, the caching mechanism is built in and works automatically. When this is not the case, we have to implement it in the app ourselves

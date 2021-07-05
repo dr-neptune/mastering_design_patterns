@@ -281,3 +281,146 @@ It has 3 key components:
 
 Memento is usually used when you need to provide some sort of undo and redo capability for your users.
 Another usage is the implementation of a UI dialog with Ok/Cancel buttons
+
+* Implementation
+
+
+#+BEGIN_SRC python :tangle memento.py
+import pickle
+
+class Quote:
+    def __init__(self, text, author):
+        self.text = text
+        self.author = author
+
+    def save_state(self):
+        return pickle.dumps(self.__dict__)
+
+    def restore_state(self, memento):
+        previous_state = pickle.loads(memento)
+        self.__dict__.clear()
+        self.__dict__.update(previous_state)
+
+    def __str__(self):
+        return f"{self.text} - By {self.author}"
+
+
+def main():
+    print("Quote 1")
+    q1 = Quote("A room without books is like a body without a soul.",
+               "unknown author")
+    print(f"\nOriginal Version:\n\t{q1}")
+    q1_mem = q1.save_state()
+
+    q1.author = "Marcus Tullius Cicero"
+    print(f"\nAn author was found. Updating:\n\t{q1}")
+
+    q1.restore_state(q1_mem)
+    print(f"\nRestoring a previous version:\n\t{q1}")
+
+
+    print("Quote 2")
+    q2 = Quote("To be you in a world that is constantly trying to make you something else is the greatest accomplishment.",
+               "Ralph Waldo Emerson")
+    print(f"\nOriginal Version:\n\t{q2}")
+    q2_mem1 = q2.save_state()
+    # change the text
+    q2.text = "To be yourself in a world that is constantly trying to make you something else is the greatest accomplishment."
+    print(f"\nThe text was updated.\n\t{q2}")
+    q2_mem2 = q2.save_state()
+    q2.text = "To be yourself when the world is constantly trying to make you something else is the greatest accomplishment."
+    print(f"\nThe text was updated again.\n\t{q2}")
+    # restoring previous state (Undo)
+    q2.restore_state(q2_mem2)
+    print(f"\nWe had to restore the 2nd version, the correct one:\n\t{q2}")
+
+
+if __name__ == '__main__':
+    main()
+#+END_SRC
+
+* Iterator Pattern
+
+Iterator is a design pattern in which an iterator is used to traverse a container and access the container's elements. The iterator pattern
+decouples algorithms from containers; in some cases, algorithms are necessarily container specific and thus cannot be decoupled.
+
+Iterator is already heavily embedded in Python. Most of the built-in containers (list, tuple, set, string, etc) are iterable. The iter() function,
+which in turn calls the __iter__() method, returns an iterator from them.
+
+#+BEGIN_SRC python :tangle iterator.py
+class FootballTeamIterator:
+    def __init__(self, members):
+        self.members = members
+        self.index = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        """Go through all the members and return them one by one until we reach the end"""
+        if self.index < len(self.members):
+            val = self.members[self.index]
+            self.index += 1
+            return val
+        else:
+            raise StopIteration()
+
+
+class FootballTeam:
+    def __init__(self, members):
+        self.members = members
+
+    def __iter__(self):
+        return FootballTeamIterator(self.members)
+
+
+def main():
+    members = [f"player{str(x)}" for x in range(1, 23)] + ["coach1", "coach2", "coach3"]
+    team = FootballTeam(members)
+    team_iter = iter(team)
+
+    while True:
+        print(next(team_iter))
+
+
+if __name__ == '__main__':
+    main()
+#+END_SRC
+
+* Template Pattern
+
+The template pattern focuses on eliminating code redundancy.
+
+* Implementation
+
+We will implement a banner generator. We want to send some text to a function, and the function should generate a banner containing the text.
+
+#+BEGIN_SRC python :tangle template.py
+from cowpy import cow
+
+def generate_banner(msg, style):
+    print("--- start of banner ---")
+    print(style(msg))
+    print("--- end of banner ---nn")
+
+def dots_style(msg):
+    msg = msg.capitalize()
+    msg = "." * 10 + msg + "." * 10
+    return msg
+
+def admire_style(msg):
+    msg = msg.upper()
+    return "!".join(msg)
+
+def cow_style(msg):
+    msg = cow.milk_random_cow(msg)
+    return msg
+
+def main():
+    msg = "happy coding"
+    [generate_banner(msg, style) for style in (dots_style, admire_style, cow_style)]
+
+
+if __name__ == '__main__':
+    main()
+#+END_SRC

@@ -1,0 +1,86 @@
+#+TITLE: The Observer Pattern in Reactive Programming
+
+In simple terms, reactive programming reacts to streams of events. We can think of an observable as a stream that can
+push or emit data to the Observer, and it can also emit events.
+
+
+NOTE:
+Couldn't get it to work. I was unable to figure out how to get the Observer class loaded
+
+* A First Example
+
+#+BEGIN_SRC python :tangle obsrx1.py
+import contextlib, io
+from rx import Observable
+import rx
+
+def get_quotes():
+    zen = io.StringIO()
+    with contextlib.redirect_stdout(zen):
+        import this
+    quotes = zen.getvalue().split("\n")[1:]
+    return quotes
+
+
+def push_quotes(obs):
+    quotes = get_quotes()
+    for q in quotes:
+        if q:  # skip empty
+            obs.on_next(q)
+    obs.on_completed()
+
+
+class ZenQuotesObserver(Observable):
+    def on_next(self, value):
+        print(f"Received:\t{value}")
+
+    def on_completed(self):
+        print("Done!")
+
+    def on_error(self, error):
+        print(f"Error Occurred:\t{error}")
+
+def main():
+    source = rx.create(push_quotes)
+    source.subscribe(ZenQuotesObserver())
+
+if __name__ == '__main__':
+    main()
+#+END_SRC
+
+
+#+BEGIN_SRC python :tangle rxobs.py
+from rx import Observable, Observer
+
+def get_quotes():
+    import contextlib, io
+    zen = io.StringIO()
+    with contextlib.redirect_stdout(zen):
+        import this
+
+    quotes = zen.getvalue().split('\n')[1:]
+    return quotes
+
+def push_quotes(obs):
+
+    quotes = get_quotes()
+    for q in quotes:
+        if q:  # skip empty
+            obs.on_next(q)
+    obs.on_completed()
+
+class ZenQuotesObserver(Observer):
+
+    def on_next(self, value):
+        print(f"Received: {value}")
+
+    def on_completed(self):
+        print("Done!")
+
+    def on_error(self, error):
+        print(f"Error Occurred: {error}")
+
+source = Observable.create(push_quotes)
+
+source.subscribe(ZenQuotesObserver())
+#+END_SRC
