@@ -257,3 +257,182 @@ if __name__ == '__main__':
 * The Cache-Aside Pattern
 
 In situations where data is more frequently read than updated, applications use a cache to optimize repeated access to information stored in a database or data store. In some systems, the caching mechanism is built in and works automatically. When this is not the case, we have to implement it in the app ourselves
+
+We perform the following:
+
+Load data on demand into a cache from a data store, as an attempt to improve performance, while maintaining consistency between data held in the cache and the data in the underlying data store.
+
+The Cache-aside pattern is useful for data that doesn't change often, and for data storage that doesn't depend on the consistency of a set of
+entries in the storage (multiple keys).
+
+* Implementation
+
+*Case 1*: We want to fetch a data item: return the item from cache if found in it. If not found in cache, read the data from the database. Put the read item in the cache and return it.
+
+*Case 2*: When we want to update a data item: write the item in the database and remove the corresponding entry from the cache.
+
+We will implement a database of quotes from which the user can ask to retrieve some quotes via an application. Our focus will be on implementing case 1.
+
+Instead of using a system with real caching capabilities like memcached or redis, we will use a CSV file to emulate how data is loaded to and read from the cache on demand.
+
+#+BEGIN_SRC python :tangle populate_db.py
+import sys
+import sqlite3
+import csv
+from random import randint
+from faker import Faker
+
+
+fake = Faker()
+
+
+def setup_db():
+    try:
+        db = sqlite3.connect("data/quotes.sqlite3")
+
+        # get a cursor object
+        cursor = db.cursor()
+        cursor.execute("""
+        CREATE TABLE quotes(id INTEGER PRIMARY KEY, text TEXT)
+        """)
+        db.commit()
+    except Exception as e:
+        print(e)
+    finally:
+        db.close()
+
+
+def add_quotes(quotes_list):
+    quotes = []
+    try:
+        db = sqlite3.connect("data/quotes.sqlite3")
+        cursor = db.cursor()
+        quotes = []
+        for quote_text in quotes_list:
+            quote_id = randint(1, 100)
+            quote = (quote_id, quote_text)
+            try:
+                cursor.execute("""INSERT INTO quotes(id, text) VALUES(?,?)""", quote)
+                quotes.append(quote)
+            except Exception as e:
+                print(f"Error with quote id {quote_id}: {e}")
+        db.commit()
+    except Exception as e:
+        print(e)
+    finally:
+        db.close()
+    return quotes
+
+
+def main():
+    args = sys.argv
+
+    # initialize the database
+    if args[1] == "init":
+        setup_db()
+    # update the database with new quotes. Write to "db" and display on screen
+    elif args[1] == "update_db_and_cache":
+        quotes_list = [fake.sentence() for _ in range(1, 11)]
+        quotes = add_quotes(quotes_list)
+        print("New (fake) quotes added to the database")
+        for q in quotes:
+            print(f"Added to DB:\t{q}")
+        # populate the cache with this content
+        with open("data/quotes_cache.csv", "a", newline="") as csv_file:
+            writer = csv.DictWriter(csv_file,
+                                    fieldnames=["id", "text"],
+                                    delimiter=";")
+            for q in quotes:
+                print(f"Adding '{q[1]}' to cache")
+                writer.writerow({'id': str(q[0]),
+                                 'text': q[1]})
+    # generate quotes, and display on screen
+    elif args[1] == "update_db_only":
+        quotes_list = [fake.sentence() for _ in range(1, 11)]
+        quotes = add_quotes(quotes_list)
+        print("New (fake) quotes added to the database ONLY:")
+        for q in quotes:
+            print(f"Added to DB: {q}")
+
+
+if __name__ == '__main__':
+    main()
+#+END_SRC
+
+#+BEGIN_SRC python :tangle cache_aside.py
+import sys
+import sqlite3
+import csv
+
+
+cache_key_prefix = "quote"
+
+
+class QuoteCache:
+    def __init__(self, filename=""):
+        self.filename = filename
+
+    def get(self, key):
+        with open(self.filename) as csv_file:
+            items = csv.reader(csv_file, delimiter=";")
+            for item in items:
+                if item[0] == key.split(".")[1]:
+                    return item[1]
+
+    def set(self, key, quote):
+        existing = []
+        with open(self.filename) as csv_file:
+            items = csv.reader(csv_file, delimiter=";")
+            existing = [cache_key_prefix + "." + item[0] for item in items]
+
+        if key in existing:
+            print("This key already exists")
+        else:
+            # save the new data
+            with open(self.filename, "a", newline="") as csv_file:
+                writer = csv.DictWriter(csv_file,
+                                        fieldnames=["id", "text"],
+                                        delimiter=";")
+                writer.writerow({"id": key.split(".")[1],
+                                 "text": quote})
+
+
+cache = QuoteCache("data/quotes_cache.csv")
+
+def get_quote(quote_id):
+    quote = cache.get(f"quote.{quote_id}")
+    out = ""
+    if quote is None:
+        try:
+            db = sqlite3.connect("data/quotes.sqlite3")
+            cursor = db.cursor()
+            cursor.execute(f"SELECT text FROM quotes WHERE id = {quote_id}")
+            for row in cursor:
+                quote = row[0]
+            print(f"Got '{quote}' from DB")
+        except Exception as e:
+            print(e)
+        finally:
+            # close the db connection
+            db.close()
+
+        # add it to the cache
+        key = f"{cache_key_prefix}.{quote_id}"
+        cache.set(key, quote)
+    else:
+        out = f"{quote} (FROM CACHE, with key 'quote.{quote_id}')"
+    return out
+
+
+if __name__ == '__main__':
+    args = sys.argv
+
+    if args[1] == "fetch":
+        while True:
+            quote_id = input("Enter the ID of the quote: ")
+            q = get_quote(quote_id)
+            if q:
+                print(q)
+#+END_SRC
+
+* Throttling
