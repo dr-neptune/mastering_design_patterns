@@ -436,3 +436,55 @@ if __name__ == '__main__':
 #+END_SRC
 
 * Throttling
+
+Throttling is limiting the number of a requests a user can send to a given web service in a given amount of time, in order to protect the
+resources of the service from being overused by some users.
+
+In practice, we may implement the following rules:
+- Limit the number of total requests to an API as n/day
+- Limit the number of total requests to an API as n/day from a given IP address or from a given country/region
+- Limit the number of reads or writes for authenticated users
+
+* Implementation
+
+There are different types of throttling, among which rate-limit, IP-level limit, and concurrent connections limiit are some.
+We will focus on the first one here. We will make an example of rate-limit throttling using a Flask app.
+
+#+BEGIN_SRC python :tangle flask_throttling.py
+from flask import Flask
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+
+app = Flask(__name__)
+
+
+# define the limiter instance
+limiter = Limiter(
+    app,
+    key_func=get_remote_address,
+    default_limits=["100 per day", "10 per hour"]
+)
+
+
+# now we can define a limited route
+@app.route("/limited")
+def limited_api():
+    return "Welcome to our API!"
+
+
+@app.route("/more_limited")
+@limiter.limit("2/minute")
+def more_limited_api():
+    return "Welcome to our expensive, thus very limited, API!"
+
+
+@app.route("/super_limited")
+@limiter.limit("1/minute")
+def super_limited_api():
+    return "This is getting out of hand"
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
+#+END_SRC
